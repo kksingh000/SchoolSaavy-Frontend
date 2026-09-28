@@ -10,6 +10,8 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { authService } from '@/services/auth';
 import { SCHOOL_KEY, USER_KEY, setUnauthorizedHandler, tokenStore } from '@/lib/http';
+import { DEMO_TOKEN, isDemo, startDemo, stopDemo } from '@/demo/session';
+import { DEMO_SCHOOL, DEMO_USERS } from '@/demo/fixtures';
 import type { AuthUser, LoginPayload, SchoolContext, UserType } from '@/types/api';
 
 interface AuthState {
@@ -21,6 +23,9 @@ interface AuthState {
   logout: () => Promise<void>;
   role: UserType | null;
   isRole: (...roles: UserType[]) => boolean;
+  /** Enters the no-backend demo as the given role. */
+  enterDemo: (role: UserType) => void;
+  demo: boolean;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -43,6 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [bootstrapping, setBootstrapping] = useState(() => Boolean(tokenStore.get()));
 
   const clearSession = useCallback(() => {
+    stopDemo();
     tokenStore.clear();
     setUser(null);
     setSchool(null);
@@ -59,9 +65,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [queryClient]);
 
   // Validate the stored token once on load — a cached user is not proof of a live session.
+  // A demo session has nothing to validate against, so it is trusted as-is.
   useEffect(() => {
     let cancelled = false;
-    if (!tokenStore.get()) {
+    if (!tokenStore.get() || isDemo()) {
       setBootstrapping(false);
       return;
     }
@@ -83,7 +90,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [clearSession]);
 
+  const enterDemo = useCallback((role: UserType) => {
+    const demoUser = (DEMO_USERS as Record<string, AuthUser>)[role] ?? DEMO_USERS.school_admin;
+    startDemo(role);
+    tokenStore.set(DEMO_TOKEN);
+    localStorage.setItem(USER_KEY, JSON.stringify(demoUser));
+    localStorage.setItem(SCHOOL_KEY, JSON.stringify(DEMO_SCHOOL));
+    setUser(demoUser);
+    setSchool(DEMO_SCHOOL);
+    setBootstrapping(false);
+    queryClient.clear();
+  }, [queryClient]);
+
   const login = useCallback(async (payload: LoginPayload) => {
+    stopDemo();
     const result = await authService.login(payload);
     tokenStore.set(result.token, result.expires_at);
     localStorage.setItem(USER_KEY, JSON.stringify(result.user));
@@ -105,10 +125,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       bootstrapping,
       login,
       logout,
+      enterDemo,
+      demo: Boolean(user) && isDemo(),
       role: user?.user_type ?? null,
       isRole: (...roles: UserType[]) => Boolean(user && roles.includes(user.user_type)),
     }),
-    [user, school, bootstrapping, login, logout],
+    [user, school, bootstrapping, login, logout, enterDemo],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

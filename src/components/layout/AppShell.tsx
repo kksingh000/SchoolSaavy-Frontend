@@ -32,7 +32,7 @@ function Logo({ compact }: { compact?: boolean }) {
 }
 
 export function AppShell() {
-  const { user, school, logout, role } = useAuth();
+  const { user, school, logout, role, demo, enterDemo } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -234,6 +234,37 @@ export function AppShell() {
             </div>
           </div>
         </header>
+
+        {demo && (
+          <div className="flex flex-col gap-2 border-b border-gold-300 bg-gold-50 px-4 py-2.5 sm:flex-row sm:items-center sm:px-6">
+            <p className="text-[13px] text-gold-800">
+              <span className="font-semibold">Demo</span> — sample data, viewing as{' '}
+              {titleCase(role ?? '')}. Nothing you do here is saved.
+            </p>
+            <div className="flex items-center gap-2 sm:ml-auto">
+              {(['school_admin', 'teacher', 'parent'] as const)
+                .filter((r) => r !== role)
+                .map((r) => (
+                  <button
+                    key={r}
+                    onClick={() => {
+                      enterDemo(r);
+                      navigate('/', { replace: true });
+                    }}
+                    className="rounded-[var(--radius-field)] border border-gold-400 bg-white px-2.5 py-1 text-[12px] font-medium text-navy-900 hover:bg-gold-100"
+                  >
+                    View as {titleCase(r)}
+                  </button>
+                ))}
+              <button
+                onClick={handleLogout}
+                className="rounded-[var(--radius-field)] px-2.5 py-1 text-[12px] font-medium text-gold-800 underline-offset-2 hover:underline"
+              >
+                Exit
+              </button>
+            </div>
+          </div>
+        )}
 
         <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
           <div className="mx-auto w-full max-w-[1280px]">

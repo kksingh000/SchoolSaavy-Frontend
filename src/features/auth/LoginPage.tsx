@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { AlertCircle, Eye, EyeOff, Lock, Mail } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff, Lock, Mail, PlayCircle } from 'lucide-react';
 import { useAuth } from '@/app/auth-context';
+import { DEMO_ROLES } from '@/demo/session';
 import { ApiError } from '@/lib/http';
 import { Button } from '@/components/ui/Button';
 import { Input, Label } from '@/components/ui/Field';
@@ -15,7 +16,7 @@ const ROLES: { value: UserType; label: string; blurb: string }[] = [
 ];
 
 export function LoginPage() {
-  const { login, user, bootstrapping } = useAuth();
+  const { login, user, bootstrapping, enterDemo } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -223,6 +224,47 @@ export function LoginPage() {
               </Link>
             </div>
           </form>
+
+          {/* No account? Explore the whole app with sample data, no backend. */}
+          <div className="mt-8">
+            <div className="flex items-center gap-3">
+              <span className="h-px flex-1 bg-ink-200" />
+              <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-ink-400">
+                Or explore the demo
+              </span>
+              <span className="h-px flex-1 bg-ink-200" />
+            </div>
+
+            <p className="mt-3 text-center text-[13px] text-ink-500">
+              Sample data, no sign-in needed. Pick a role to see what they see.
+            </p>
+
+            <div className="mt-3.5 space-y-2">
+              {DEMO_ROLES.map((option) => (
+                <button
+                  key={option.role}
+                  type="button"
+                  onClick={() => {
+                    enterDemo(option.role);
+                    navigate('/', { replace: true });
+                  }}
+                  className={cn(
+                    'group flex w-full items-center gap-3 rounded-[var(--radius-field)] border border-ink-200 bg-white px-3.5 py-2.5 text-left',
+                    'transition-all hover:border-gold-400 hover:bg-gold-50/60',
+                  )}
+                >
+                  <PlayCircle className="size-[18px] shrink-0 text-ink-400 transition-colors group-hover:text-gold-600" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[13.5px] font-medium text-ink-900">
+                      Explore as {option.label}
+                    </span>
+                    <span className="block truncate text-[12px] text-ink-500">{option.blurb}</span>
+                  </span>
+                  <span className="shrink-0 text-ink-300 transition-transform group-hover:translate-x-0.5">›</span>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </main>
     </div>

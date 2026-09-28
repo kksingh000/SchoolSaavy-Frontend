@@ -5,6 +5,7 @@ import axios, {
   type InternalAxiosRequestConfig,
 } from 'axios';
 import type { ApiEnvelope, PaginatedEnvelope, Paginated } from '@/types/api';
+import { isDemo, resolveDemoGet, DEMO_WRITE_MESSAGE } from '@/demo/resolver';
 
 export const TOKEN_KEY = 'schoolsaavy.token';
 export const TOKEN_EXPIRY_KEY = 'schoolsaavy.token_expires_at';
@@ -149,31 +150,55 @@ function unwrap<T>(body: unknown): T {
   return body as T;
 }
 
+/* -------------------------------- demo ---------------------------------- */
+
+/**
+ * Demo mode answers every request from local fixtures, so the deployed site is
+ * fully explorable with no account and no backend. It is the only branch in
+ * this file that does not hit the network; feature code never knows.
+ */
+function demoUrl(url: string, config?: AxiosRequestConfig): string {
+  const params = config?.params as Record<string, unknown> | undefined;
+  if (!params) return url;
+  const qs = Object.entries(params)
+    .filter(([, v]) => v !== undefined && v !== null && v !== '')
+    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
+    .join('&');
+  return qs ? `${url}${url.includes('?') ? '&' : '?'}${qs}` : url;
+}
+
 export const api = {
   async get<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
+    if (isDemo()) return unwrap<T>(resolveDemoGet(demoUrl(url, config)));
     const { data } = await http.get(url, config);
     return unwrap<T>(data);
   },
   async post<T>(url: string, payload?: unknown, config?: AxiosRequestConfig): Promise<T> {
+    if (isDemo()) throw new ApiError(DEMO_WRITE_MESSAGE, 403, undefined, 'DEMO_READONLY');
     const { data } = await http.post(url, payload, config);
     return unwrap<T>(data);
   },
   async put<T>(url: string, payload?: unknown, config?: AxiosRequestConfig): Promise<T> {
+    if (isDemo()) throw new ApiError(DEMO_WRITE_MESSAGE, 403, undefined, 'DEMO_READONLY');
     const { data } = await http.put(url, payload, config);
     return unwrap<T>(data);
   },
   async patch<T>(url: string, payload?: unknown, config?: AxiosRequestConfig): Promise<T> {
+    if (isDemo()) throw new ApiError(DEMO_WRITE_MESSAGE, 403, undefined, 'DEMO_READONLY');
     const { data } = await http.patch(url, payload, config);
     return unwrap<T>(data);
   },
   async delete<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
+    if (isDemo()) throw new ApiError(DEMO_WRITE_MESSAGE, 403, undefined, 'DEMO_READONLY');
     const { data } = await http.delete(url, config);
     return unwrap<T>(data);
   },
 
   /** Keeps `meta` alongside the rows for paginated endpoints. */
   async paginated<T>(url: string, config?: AxiosRequestConfig): Promise<Paginated<T>> {
-    const { data } = await http.get<PaginatedEnvelope<T>>(url, config);
+    const data = isDemo()
+      ? (resolveDemoGet(demoUrl(url, config)) as PaginatedEnvelope<T>)
+      : (await http.get<PaginatedEnvelope<T>>(url, config)).data;
     const items = Array.isArray(data?.data) ? data.data : [];
     return {
       items,
@@ -197,6 +222,8 @@ export const api = {
 
 /** Reads the `notification` block Laravel attaches to some responses. */
 export async function getWithNotification<T>(url: string, config?: AxiosRequestConfig) {
-  const { data } = await http.get<ApiEnvelope<T>>(url, config);
+  const data = isDemo()
+    ? (resolveDemoGet(demoUrl(url, config)) as ApiEnvelope<T>)
+    : (await http.get<ApiEnvelope<T>>(url, config)).data;
   return { data: unwrap<T>(data), notification: data?.notification ?? null };
 }
