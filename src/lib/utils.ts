@@ -92,3 +92,47 @@ export function downloadBlob(blob: Blob, filename: string) {
   a.remove();
   URL.revokeObjectURL(url);
 }
+
+/**
+ * Human-relative time for notifications, activity logs and events —
+ * "2 minutes ago", "yesterday", "3 weeks ago". Falls back to a formatted
+ * date once the gap is large enough that relative phrasing stops being useful.
+ */
+export function relativeTime(value: string | Date | null | undefined, now: Date = new Date()) {
+  if (!value) return '—';
+  const date = typeof value === 'string' ? parseISO(value) : value;
+  if (!isValid(date)) return '—';
+
+  const diffMs = now.getTime() - date.getTime();
+  const diffSec = Math.round(diffMs / 1000);
+  const future = diffSec < 0;
+  const abs = Math.abs(diffSec);
+
+  if (abs < 45) return future ? 'in a few seconds' : 'just now';
+
+  const units: [string, number][] = [
+    ['minute', 60],
+    ['hour', 60],
+    ['day', 24],
+    ['week', 7],
+    ['month', 4.348],
+    ['year', 12],
+  ];
+
+  let value_ = abs;
+  let unit = 'second';
+  for (const [name, factor] of units) {
+    if (value_ < factor) break;
+    value_ = Math.floor(value_ / factor);
+    unit = name;
+  }
+
+  // Beyond ~6 months, an absolute date reads better than "6 months ago".
+  if (unit === 'year' || (unit === 'month' && value_ >= 6)) {
+    return format(date, 'd MMM yyyy');
+  }
+
+  const rounded = Math.max(1, Math.round(value_));
+  const plural = rounded === 1 ? unit : `${unit}s`;
+  return future ? `in ${rounded} ${plural}` : `${rounded} ${plural} ago`;
+}
